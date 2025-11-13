@@ -2,6 +2,8 @@
 
 A data science project for predicting NSE stock price movements using machine learning and financial news sentiment analysis.
 
+> Looking for a narrative, high-level overview? See `docs/NEWS2PROFIT_Overview.md`.
+
 ## Project Overview
 
 This project predicts whether an NSE stock's price will go up, down, or stay neutral the next day by combining:

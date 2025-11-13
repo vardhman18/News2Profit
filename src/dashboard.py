@@ -131,6 +131,10 @@ class News2ProfitDashboard:
             st.session_state.predictions = None
             # Try to load existing predictions
             self.load_existing_predictions()
+        
+        # Control rendering: show predictions only after explicit button click
+        if 'show_predictions' not in st.session_state:
+            st.session_state.show_predictions = False
     
     def load_existing_predictions(self):
         """Load existing predictions from CSV file"""
@@ -435,9 +439,9 @@ class News2ProfitDashboard:
         st.markdown('<p style="text-align: center; font-size: 1.2rem; color: #666;">Predicting Movement for Top 5 NSE Stocks with ML & News Sentiment</p>', unsafe_allow_html=True)
         st.markdown('<p style="text-align: center; font-size: 1rem; color: #888;">🎯 RELIANCE • TCS • HDFCBANK • INFY • ICICIBANK</p>', unsafe_allow_html=True)
         
-        # Show latest predictions summary
-        if st.session_state.predictions:
-            st.success("🎯 **Latest ML Predictions Available!** - 76.46% accuracy Logistic Regression model")
+        # Show latest predictions summary only after user generates them in this session
+        if st.session_state.get('show_predictions') and st.session_state.get('predictions'):
+            st.success("🎯 **Latest ML Predictions Generated!**")
         
         st.markdown("---")
     
@@ -639,31 +643,25 @@ class News2ProfitDashboard:
                         for _, row in predictions_df.iterrows():
                             preds[row['symbol']] = {'prediction': row['prediction'], 'confidence': float(row.get('confidence', 0)), 'date': row.get('date')}
                         st.session_state.predictions = preds
+                        # Gate to allow predictions to render in main content
+                        st.session_state.show_predictions = True
                     except Exception:
                         pass
 
-                # Display model performance and predictions
-                st.subheader("📊 Model Performance")
-                comparison_df = predictor.get_model_comparison()
-                st.dataframe(comparison_df)
-
-                st.subheader("🔮 Predictions")
-                if os.path.exists(predictions_path):
-                    st.dataframe(pd.read_csv(predictions_path))
-
-                st.success("✅ Predictions generated successfully")
+                # Confirm generation; rendering happens in main content to avoid duplicates
+                st.success("✅ Predictions generated successfully. Scroll to see them below.")
 
             except Exception as e:
                 st.error(f"❌ Error generating predictions: {str(e)}")
     
     def render_main_content(self, stocks, start_date, end_date):
         """Render the main content area"""
-        # Show predictions for selected stocks (if available)
-        try:
-            self.show_predictions_for_selected_stocks(stocks)
-        except Exception:
-            # Fallback - ignore if predictions not available
-            pass
+        # Show predictions only when user has explicitly generated them
+        if st.session_state.get('show_predictions'):
+            try:
+                self.show_predictions_for_selected_stocks(stocks)
+            except Exception:
+                pass
         
         # Data Overview
         if st.session_state.data_loaded:

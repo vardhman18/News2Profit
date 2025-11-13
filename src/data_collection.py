@@ -30,6 +30,42 @@ class StockDataCollector:
     
     def __init__(self):
         self.data = {}
+
+    def _normalize_stock_df(self, df: pd.DataFrame, symbol: str) -> pd.DataFrame:
+        df = df.copy()
+        if not df.index.name and 'Date' in df.columns:
+            df.set_index('Date', inplace=True)
+        # Reset index to get date as column
+        df.reset_index(inplace=True)
+        # Clean column names
+        df.columns = [str(col).lower().replace(' ', '_') for col in df.columns]
+        # Ensure date column exists
+        if 'date' not in df.columns:
+            # Try common alternatives
+            for alt in ['datetime', 'index']:
+                if alt in df.columns:
+                    df.rename(columns={alt: 'date'}, inplace=True)
+                    break
+        df['date'] = pd.to_datetime(df['date'], errors='coerce')
+        df = df.dropna(subset=['date'])
+        df['date'] = df['date'].dt.date
+        df['symbol'] = symbol
+        # Keep standard columns if present
+        keep = [c for c in ['date', 'open', 'high', 'low', 'close', 'adj_close', 'volume', 'symbol'] if c in df.columns]
+        return df[keep] if keep else df
+
+    def _load_existing_raw(self, symbol: str) -> Optional[pd.DataFrame]:
+        try:
+            base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+            fname = os.path.join(base_dir, RAW_DATA_DIR, f"{symbol.replace('.', '_')}_historical.csv")
+            if os.path.exists(fname):
+                df = pd.read_csv(fname)
+                if not df.empty:
+                    logger.warning(f"Using existing raw CSV as fallback for {symbol}: {fname}")
+                    return self._normalize_stock_df(df, symbol)
+        except Exception as e:
+            logger.error(f"Fallback read failed for {symbol}: {e}")
+        return None
     
     def fetch_stock_data(self, symbols: List[str], period: str = "2y") -> Dict[str, pd.DataFrame]:
         """
@@ -46,30 +82,51 @@ class StockDataCollector:
         
         for symbol in symbols:
             try:
+                # Attempt 1: Ticker.history with explicit params
                 ticker = yf.Ticker(symbol)
-                data = ticker.history(period=period)
-                
-                if not data.empty:
-                    # Reset index to get date as column
-                    data.reset_index(inplace=True)
-                    
-                    # Clean column names  
-                    data.columns = [col.lower().replace(' ', '_') for col in data.columns]
-                    data['symbol'] = symbol
-                    
-                    # Handle date column - ensure we have a date column
-                    if 'date' not in data.columns:
-                        # If no date column, the index was likely the date
-                        data['date'] = data.index
-                    
-                    # Convert date to proper format
-                    data['date'] = pd.to_datetime(data['date']).dt.date
-                    
-                    self.data[symbol] = data
-                    logger.info(f"Successfully fetched {len(data)} records for {symbol}")
+                data = ticker.history(
+                    period=period,
+                    interval='1d',
+                    auto_adjust=True,
+                    actions=False,
+                    repair=True,
+                    raise_errors=False
+                )
+
+                if data is None or data.empty:
+                    logger.warning(f"No data via Ticker.history for {symbol}; trying yf.download ...")
+                    # Attempt 2: yf.download fallback
+                    try:
+                        dl = yf.download(
+                            tickers=symbol,
+                            period=period,
+                            interval='1d',
+                            auto_adjust=True,
+                            actions=False,
+                            threads=False
+                        )
+                    except TypeError:
+                        # Older yfinance versions may not support some args
+                        dl = yf.download(tickers=symbol, period=period, interval='1d', threads=False)
+                    data = dl
+
+                if data is None or data.empty:
+                    logger.warning(f"No Yahoo data for {symbol}; attempting local CSV fallback ...")
+                    fallback_df = self._load_existing_raw(symbol)
+                    if fallback_df is not None and not fallback_df.empty:
+                        self.data[symbol] = fallback_df
+                        logger.info(f"Loaded {len(fallback_df)} fallback records for {symbol}")
+                        continue
+                    else:
+                        logger.warning(f"No data found for {symbol}")
+                        continue
+
+                norm = self._normalize_stock_df(data, symbol)
+                if norm is not None and not norm.empty:
+                    self.data[symbol] = norm
+                    logger.info(f"Successfully fetched {len(norm)} records for {symbol}")
                 else:
-                    logger.warning(f"No data found for {symbol}")
-                    
+                    logger.warning(f"Data normalization produced empty frame for {symbol}")
             except Exception as e:
                 logger.error(f"Error fetching data for {symbol}: {str(e)}")
         
@@ -82,7 +139,8 @@ class StockDataCollector:
     def save_stock_data(self, filepath: str = None) -> None:
         """Save collected stock data to CSV files"""
         if filepath is None:
-            filepath = RAW_DATA_DIR
+            base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+            filepath = os.path.join(base_dir, RAW_DATA_DIR)
         
         os.makedirs(filepath, exist_ok=True)
         

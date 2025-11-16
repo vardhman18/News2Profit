@@ -1,3 +1,0 @@
-model,accuracy,precision,recall,f1_score
-xgboost,1.0,1.0,1.0,1.0
-logistic_regression,0.98989898989899,0.9900378137569789,0.98989898989899,0.9888360293602242

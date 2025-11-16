@@ -8,17 +8,30 @@ try:
 except ImportError:
     print("Warning: python-dotenv not installed. Using environment variables only.")
 
-# API Keys
-NEWS_API_KEY = os.getenv('NEWS_API_KEY')  # Now used for SerpApi key
-SERPAPI_KEY = os.getenv('SERPAPI_KEY', os.getenv('NEWS_API_KEY'))  # SerpApi key
-TWITTER_BEARER_TOKEN = os.getenv('TWITTER_BEARER_TOKEN')
-TWITTER_API_KEY = os.getenv('TWITTER_API_KEY')
-TWITTER_API_SECRET = os.getenv('TWITTER_API_SECRET')
-TWITTER_ACCESS_TOKEN = os.getenv('TWITTER_ACCESS_TOKEN')
-TWITTER_ACCESS_TOKEN_SECRET = os.getenv('TWITTER_ACCESS_TOKEN_SECRET')
-REDDIT_CLIENT_ID = os.getenv('REDDIT_CLIENT_ID')
-REDDIT_CLIENT_SECRET = os.getenv('REDDIT_CLIENT_SECRET')
-REDDIT_USER_AGENT = os.getenv('REDDIT_USER_AGENT', 'NEWS2PROFIT/1.0')
+# API Keys (support Streamlit Cloud secrets if available)
+_secrets = {}
+try:
+    import streamlit as st  # type: ignore
+    _secrets = dict(st.secrets)
+except Exception:
+    _secrets = {}
+
+def _get_secret(name: str, default: str | None = None) -> str | None:
+    return os.getenv(name) or _secrets.get(name) or default
+
+# Prefer SERPAPI_KEY; allow legacy NEWS_API_KEY as fallback
+NEWS_API_KEY = _get_secret('NEWS_API_KEY')
+SERPAPI_KEY = _get_secret('SERPAPI_KEY', NEWS_API_KEY)
+
+TWITTER_BEARER_TOKEN = _get_secret('TWITTER_BEARER_TOKEN')
+TWITTER_API_KEY = _get_secret('TWITTER_API_KEY')
+TWITTER_API_SECRET = _get_secret('TWITTER_API_SECRET')
+TWITTER_ACCESS_TOKEN = _get_secret('TWITTER_ACCESS_TOKEN')
+TWITTER_ACCESS_TOKEN_SECRET = _get_secret('TWITTER_ACCESS_TOKEN_SECRET')
+
+REDDIT_CLIENT_ID = _get_secret('REDDIT_CLIENT_ID')
+REDDIT_CLIENT_SECRET = _get_secret('REDDIT_CLIENT_SECRET')
+REDDIT_USER_AGENT = _get_secret('REDDIT_USER_AGENT', 'NEWS2PROFIT/1.0')
 
 # NSE Stock Symbols
 NSE_STOCKS = [

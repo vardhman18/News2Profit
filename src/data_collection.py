@@ -162,7 +162,20 @@ class NewsDataCollector:
     
     def _setup_news_api(self):
         """Setup SerpApi client for Google News Light"""
-        self.news_api_key = "2058dccfc69d81a0fa8c2981e188354034ee90d1c3354e78d42bd96a9979f6e8"
+        # Prefer configured key; try Streamlit secrets if available when running on Streamlit
+        api_key = None
+        try:
+            import streamlit as st  # type: ignore
+            api_key = st.secrets.get('SERPAPI_KEY', None)
+        except Exception:
+            api_key = None
+        # Fallback to config-provided env var mappings
+        try:
+            # SERPAPI_KEY may be provided via config import
+            api_key = api_key or SERPAPI_KEY or NEWS_API_KEY
+        except Exception:
+            pass
+        self.news_api_key = api_key
         self.news_base_url = "https://serpapi.com/search"
 
     

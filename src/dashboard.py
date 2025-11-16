@@ -16,17 +16,36 @@ import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 import os
 import sys
-import joblib
 import warnings
 warnings.filterwarnings('ignore')
 
 # Add src directory to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from config.config import *
-from src.data_collection import StockDataCollector, NewsDataCollector
-from src.preprocessing import StockDataPreprocessor, NewsDataPreprocessor, DataIntegrator
-from src.sentiment import SentimentAnalyzer
-from src.model import StockPredictor, LogisticRegressionModel, XGBoostModel, LSTMModel
+
+# Graceful imports for Streamlit Cloud
+try:
+    from config.config import *
+    from src.data_collection import StockDataCollector, NewsDataCollector
+    from src.preprocessing import StockDataPreprocessor, NewsDataPreprocessor, DataIntegrator
+    from src.sentiment import SentimentAnalyzer
+    ML_AVAILABLE = True
+except ImportError as e:
+    st.error(f"Some ML components not available: {e}")
+    ML_AVAILABLE = False
+
+# Optional ML model imports
+try:
+    from src.model import StockPredictor, LogisticRegressionModel, XGBoostModel, LSTMModel
+    MODELS_AVAILABLE = True
+except ImportError as e:
+    st.warning(f"Advanced ML models not available: {e}")
+    MODELS_AVAILABLE = False
+
+try:
+    import joblib
+    JOBLIB_AVAILABLE = True
+except ImportError:
+    JOBLIB_AVAILABLE = False
 
 
 def generate_and_save_predictions():

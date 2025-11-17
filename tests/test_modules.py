@@ -143,7 +143,7 @@ class TestSentimentAnalysis(unittest.TestCase):
             "Market crash expected due to economic uncertainty and bad news.",
             "The stock is trading sideways in a normal pattern.",
             "",  # Empty text
-            "HODL! This stock is going to the moon! 🚀"
+            "HODL! This stock is going to the moon!"
         ]
     
     def test_vader_sentiment_analysis(self):
@@ -314,7 +314,7 @@ if __name__ == "__main__":
     success = run_all_tests()
     
     if success:
-        print("\n✅ All tests passed!")
+        print("\n All tests passed!")
     else:
-        print("\n❌ Some tests failed!")
+        print("\n Some tests failed!")
         sys.exit(1)

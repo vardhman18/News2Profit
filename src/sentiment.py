@@ -630,7 +630,7 @@ def main():
         "The stock market is showing strong bullish momentum with great earnings.",
         "Market crash expected due to economic uncertainty and bearish sentiment.",
         "The stock is holding steady in a sideways trading pattern.",
-        "HODL! This stock is going to the moon! 🚀",
+        "HODL! This stock is going to the moon! ",
         "FUD is spreading, but diamond hands will prevail in this bull market."
     ]
     

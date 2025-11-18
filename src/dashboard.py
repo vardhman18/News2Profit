@@ -50,38 +50,41 @@ except ImportError:
 
 def generate_and_save_predictions():
     """
-    Generate predictions using the trained Logistic Regression model and save them to latest_predictions.csv.
+    Generate predictions for the latest date using the latest data and trained models.
     """
     try:
-        # Load the processed data
-        processed_data_path = "d:\\NEWS2PROFIT\\notebooks\\data\\raw\\combined_data_20251010_092303.csv"
-        data = pd.read_csv(processed_data_path)
-
-        # Preprocess the data
-        preprocessor = StockDataPreprocessor()
-        ml_ready_data = preprocessor.prepare_features(data)
-
-        # Load the trained model
-        lr_model = LogisticRegressionModel()
-        lr_model.load_model("d:\\NEWS2PROFIT\\data\\models\\logistic_regression_model.pkl")
-
-        # Generate predictions
-        predictions = lr_model.predict(ml_ready_data)
-
-        # Prepare the predictions DataFrame
-        predictions_df = pd.DataFrame({
-            "symbol": ml_ready_data["symbol"],
-            "prediction": predictions["prediction"],
-            "confidence": predictions["confidence"],
-            "date": datetime.now().strftime("%Y-%m-%d")
-        })
-
-        # Save to latest_predictions.csv
-        predictions_df.to_csv("d:\\NEWS2PROFIT\\data\\processed\\latest_predictions.csv", index=False)
-        st.success("✅ Latest predictions saved successfully!")
-        return predictions_df
+        import subprocess
+        import sys
+        
+        # Run the latest predictions generation script
+        script_path = os.path.join(os.path.dirname(__file__), '..', 'generate_latest_predictions.py')
+        
+        with st.spinner('Generating predictions for the latest date...'):
+            # Run the script and capture output
+            result = subprocess.run(
+                [sys.executable, script_path], 
+                capture_output=True, 
+                text=True, 
+                cwd=os.path.dirname(script_path)
+            )
+            
+            if result.returncode == 0:
+                # Load the generated predictions
+                predictions_path = os.path.join(PROCESSED_DATA_DIR, 'latest_predictions.csv')
+                if os.path.exists(predictions_path):
+                    predictions_df = pd.read_csv(predictions_path)
+                    st.success(f"✅ Latest predictions generated for {predictions_df['date'].iloc[0]}!")
+                    return predictions_df
+                else:
+                    st.error("❌ Predictions file not found after generation")
+                    return None
+            else:
+                st.error(f"❌ Error generating predictions: {result.stderr}")
+                st.error(f"Script output: {result.stdout}")
+                return None
+                
     except Exception as e:
-        st.error(f"❌ Error generating predictions: {e}")
+        st.error(f"❌ Error running prediction generation: {e}")
         return None
 
 
@@ -492,7 +495,26 @@ class News2ProfitDashboard:
         # Action buttons
         st.sidebar.subheader("🎯 Actions")
         
-        if st.sidebar.button("📥 Load Data", type="primary"):
+        # Quick Prediction Generation (uses latest data and trained models)
+        if st.sidebar.button("⚡ Generate Latest Predictions", type="primary"):
+            predictions_df = generate_and_save_predictions()
+            if predictions_df is not None:
+                st.session_state.show_predictions = True
+                # Convert to session dict format
+                preds = {}
+                for _, row in predictions_df.iterrows():
+                    preds[row['symbol']] = {
+                        'prediction': row['prediction'], 
+                        'confidence': float(row['confidence']), 
+                        'date': row['date']
+                    }
+                st.session_state.predictions = preds
+                st.rerun()
+        
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("**Advanced Options:**")
+        
+        if st.sidebar.button("📥 Load Data"):
             self.load_data(selected_stocks, start_date, end_date)
         
         if st.sidebar.button("🧠 Train Models"):
@@ -500,12 +522,6 @@ class News2ProfitDashboard:
                 self.train_models()
             else:
                 st.sidebar.error("Please load data first!")
-        
-        if st.sidebar.button("🔮 Generate Predictions"):
-            if st.session_state.models_trained:
-                self.generate_predictions(model_type)
-            else:
-                st.sidebar.error("Please train models first!")
         
         return selected_stocks, start_date, end_date, model_type
     
@@ -632,25 +648,79 @@ class News2ProfitDashboard:
                     st.session_state.processed_data = ml_data
                     st.session_state.models_trained = True
 
-                # Generate and save predictions using the same helper from train_models
+                # Generate predictions for the latest date
                 try:
-                    # Import generate_predictions from top-level training script
-                    from train_models import generate_predictions as tm_generate_predictions
-                    predictions_summary = tm_generate_predictions(predictor, ml_data)
-                except Exception:
-                    # Fallback: try predictor.generate via load_and_predict
-                    try:
-                        predictions_df = predictor.load_and_predict(ml_data)
-                        predictions_summary = []
-                        if isinstance(predictions_df, pd.DataFrame):
-                            # Save to processed latest_predictions.csv
-                            predictions_path = os.path.join(PROCESSED_DATA_DIR, 'latest_predictions.csv')
-                            os.makedirs(os.path.dirname(predictions_path), exist_ok=True)
-                            predictions_df.to_csv(predictions_path, index=False)
-                            predictions_summary = predictions_df.to_dict('records')
-                    except Exception as e:
-                        st.error(f"❌ Error generating predictions: {e}")
-                        return
+                    predictions_summary = []
+                    today = datetime.now().date()
+                    
+                    # Generate predictions for each stock for the latest date
+                    for symbol in NSE_STOCKS:
+                        symbol_data = ml_data[ml_data['symbol'] == symbol].copy()
+                        
+                        if symbol_data.empty:
+                            continue
+                        
+                        # Sort by date and get the latest record
+                        symbol_data = symbol_data.sort_values('date')
+                        latest_record = symbol_data.iloc[-1:].copy()
+                        
+                        # Prepare features for prediction
+                        feature_cols = [col for col in latest_record.columns if col not in [
+                            'date', 'symbol', 'target', 'target_ml', 'target_binary', 'target_numeric',
+                            'next_day_return', 'next_day_close', 'next_day_price_change',
+                            'next_day_price_change_pct'
+                        ]]
+                        
+                        X_latest = latest_record[feature_cols].copy()
+                        X_latest = X_latest.replace([np.inf, -np.inf], 0)
+                        X_latest = X_latest.fillna(0)
+                        
+                        # Make prediction
+                        try:
+                            prediction = predictor.predict(X_latest)
+                            if isinstance(prediction, (list, np.ndarray)) and len(prediction) > 0:
+                                pred_value = prediction[0]
+                            else:
+                                pred_value = prediction
+                            
+                            # Convert prediction to label
+                            if isinstance(pred_value, (int, np.integer)):
+                                pred_label = ['DOWN', 'NEUTRAL', 'UP'][min(int(pred_value), 2)]
+                            else:
+                                pred_label = str(pred_value)
+                            
+                            # Get confidence
+                            try:
+                                best_model_name = getattr(predictor, 'best_model', 'logistic_regression')
+                                if best_model_name in predictor.models:
+                                    model = predictor.models[best_model_name]
+                                    probabilities = model.predict_proba(X_latest)[0]
+                                    confidence = float(np.max(probabilities))
+                                else:
+                                    confidence = 0.85
+                            except:
+                                confidence = 0.85
+                            
+                            predictions_summary.append({
+                                'symbol': symbol,
+                                'prediction': pred_label,
+                                'confidence': confidence,
+                                'date': today.strftime('%Y-%m-%d')
+                            })
+                            
+                        except Exception as e:
+                            st.warning(f"Could not generate prediction for {symbol}: {str(e)}")
+                    
+                    # Save predictions
+                    if predictions_summary:
+                        predictions_df = pd.DataFrame(predictions_summary)
+                        predictions_path = os.path.join(PROCESSED_DATA_DIR, 'latest_predictions.csv')
+                        os.makedirs(os.path.dirname(predictions_path), exist_ok=True)
+                        predictions_df.to_csv(predictions_path, index=False)
+                        
+                except Exception as e:
+                    st.error(f"❌ Error generating predictions: {e}")
+                    return
 
                 # Load saved predictions into session state
                 predictions_path = os.path.join(PROCESSED_DATA_DIR, 'latest_predictions.csv')

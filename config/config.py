@@ -33,11 +33,29 @@ REDDIT_CLIENT_ID = _get_secret('REDDIT_CLIENT_ID')
 REDDIT_CLIENT_SECRET = _get_secret('REDDIT_CLIENT_SECRET')
 REDDIT_USER_AGENT = _get_secret('REDDIT_USER_AGENT', 'NEWS2PROFIT/1.0')
 
-# NSE Stock Symbols
+# NSE Stock Symbols (Yahoo Finance compatible)
 NSE_STOCKS = [
     'RELIANCE.NS', 'TCS.NS', 'HDFCBANK.NS', 'INFY.NS', 
     'ICICIBANK.NS'
 ]
+
+# Alternative symbol mappings for Yahoo Finance
+SYMBOL_MAPPINGS = {
+    'TCS.NS': 'TCS.NS',  # Sometimes needs to be tried as different variations
+    'RELIANCE.NS': 'RELIANCE.NS',
+    'HDFCBANK.NS': 'HDFCBANK.NS',
+    'INFY.NS': 'INFY.NS',
+    'ICICIBANK.NS': 'ICICIBANK.NS'
+}
+
+# Fallback symbols if primary fails
+FALLBACK_SYMBOLS = {
+    'TCS.NS': ['TCS.BO', 'TCS'],  # Try Bombay Exchange or without suffix
+    'RELIANCE.NS': ['RELIANCE.BO', 'RELIANCE'],
+    'HDFCBANK.NS': ['HDFCBANK.BO', 'HDFCBANK'],
+    'INFY.NS': ['INFY.BO', 'INFY'],
+    'ICICIBANK.NS': ['ICICIBANK.BO', 'ICICIBANK']
+}
 
 # Nifty Index
 NIFTY_INDEX = '^NSEI'

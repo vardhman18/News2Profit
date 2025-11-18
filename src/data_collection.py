@@ -67,6 +67,54 @@ class StockDataCollector:
             logger.error(f"Fallback read failed for {symbol}: {e}")
         return None
     
+    def _try_symbol_variants(self, symbol: str, period: str) -> Optional[pd.DataFrame]:
+        """Try different symbol variations for problematic tickers"""
+        variants = [symbol]
+        
+        # Add fallback symbols if configured
+        from config.config import FALLBACK_SYMBOLS
+        if symbol in FALLBACK_SYMBOLS:
+            variants.extend(FALLBACK_SYMBOLS[symbol])
+        
+        for variant in variants:
+            logger.info(f"Trying symbol variant: {variant}")
+            try:
+                ticker = yf.Ticker(variant)
+                data = ticker.history(
+                    period=period,
+                    interval='1d',
+                    auto_adjust=True,
+                    actions=False,
+                    repair=True,
+                    raise_errors=False
+                )
+                
+                if data is not None and not data.empty:
+                    logger.info(f"Success with variant {variant} for original symbol {symbol}")
+                    return data
+                    
+                # Also try yf.download for this variant
+                try:
+                    dl = yf.download(
+                        tickers=variant,
+                        period=period,
+                        interval='1d',
+                        auto_adjust=True,
+                        actions=False,
+                        threads=False
+                    )
+                    if dl is not None and not dl.empty:
+                        logger.info(f"Success with yf.download variant {variant} for original symbol {symbol}")
+                        return dl
+                except Exception as e:
+                    logger.debug(f"yf.download failed for variant {variant}: {e}")
+                    
+            except Exception as e:
+                logger.debug(f"Variant {variant} failed: {e}")
+                continue
+        
+        return None
+
     def fetch_stock_data(self, symbols: List[str], period: str = "2y") -> Dict[str, pd.DataFrame]:
         """
         Fetch historical stock data for given symbols
@@ -82,36 +130,13 @@ class StockDataCollector:
         
         for symbol in symbols:
             try:
-                # Attempt 1: Ticker.history with explicit params
-                ticker = yf.Ticker(symbol)
-                data = ticker.history(
-                    period=period,
-                    interval='1d',
-                    auto_adjust=True,
-                    actions=False,
-                    repair=True,
-                    raise_errors=False
-                )
+                # Attempt 1: Try symbol variants (primary + fallbacks)
+                data = self._try_symbol_variants(symbol, period)
 
                 if data is None or data.empty:
-                    logger.warning(f"No data via Ticker.history for {symbol}; trying yf.download ...")
-                    # Attempt 2: yf.download fallback
-                    try:
-                        dl = yf.download(
-                            tickers=symbol,
-                            period=period,
-                            interval='1d',
-                            auto_adjust=True,
-                            actions=False,
-                            threads=False
-                        )
-                    except TypeError:
-                        # Older yfinance versions may not support some args
-                        dl = yf.download(tickers=symbol, period=period, interval='1d', threads=False)
-                    data = dl
-
+                    logger.warning(f"No Yahoo data for {symbol} (tried all variants); attempting local CSV fallback ...")
                 if data is None or data.empty:
-                    logger.warning(f"No Yahoo data for {symbol}; attempting local CSV fallback ...")
+                    logger.warning(f"No Yahoo data for {symbol} (tried all variants); attempting local CSV fallback ...")
                     fallback_df = self._load_existing_raw(symbol)
                     if fallback_df is not None and not fallback_df.empty:
                         self.data[symbol] = fallback_df

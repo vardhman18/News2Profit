@@ -82,7 +82,7 @@ class StockDataCollector:
         return None
     
     def _try_symbol_variants(self, symbol: str, period: str) -> Optional[pd.DataFrame]:
-        """Try different symbol variations for problematic tickers"""
+        """Try different symbol variations and advanced fetching methods"""
         variants = [symbol]
         
         # Add fallback symbols if configured
@@ -90,48 +90,96 @@ class StockDataCollector:
         if symbol in FALLBACK_SYMBOLS:
             variants.extend(FALLBACK_SYMBOLS[symbol])
         
+        # Try different periods if the requested period fails
+        periods_to_try = [period, "1y", "6mo", "3mo", "1mo"] if period not in ["1y", "6mo", "3mo", "1mo"] else [period]
+        
         for variant in variants:
             logger.info(f"Trying symbol variant: {variant}")
-            try:
-                ticker = yf.Ticker(variant)
-                data = ticker.history(
-                    period=period,
-                    interval='1d',
-                    auto_adjust=True,
-                    actions=False,
-                    repair=True,
-                    raise_errors=False
-                )
-                
-                if data is not None and not data.empty:
-                    logger.info(f"Success with variant {variant} for original symbol {symbol}")
-                    return data
-                    
-                # Also try yf.download for this variant
+            
+            for try_period in periods_to_try:
                 try:
-                    dl = yf.download(
-                        tickers=variant,
-                        period=period,
-                        interval='1d',
-                        auto_adjust=True,
-                        actions=False,
-                        threads=False
-                    )
-                    if dl is not None and not dl.empty:
-                        logger.info(f"Success with yf.download variant {variant} for original symbol {symbol}")
-                        return dl
-                except Exception as e:
-                    logger.debug(f"yf.download failed for variant {variant}: {e}")
+                    # Method 1: Direct ticker with multiple parameters
+                    ticker = yf.Ticker(variant)
                     
-            except Exception as e:
-                logger.debug(f"Variant {variant} failed: {e}")
-                continue
+                    # Try with repair and different settings
+                    for repair_setting in [True, False]:
+                        try:
+                            data = ticker.history(
+                                period=try_period,
+                                interval='1d',
+                                auto_adjust=True,
+                                actions=False,
+                                repair=repair_setting,
+                                raise_errors=False,
+                                timeout=30
+                            )
+                            
+                            if data is not None and not data.empty and len(data) > 10:
+                                logger.info(f"Success with ticker.history {variant} (period={try_period}, repair={repair_setting})")
+                                return data
+                        except Exception as e:
+                            logger.debug(f"ticker.history failed for {variant} with repair={repair_setting}: {e}")
+                    
+                    # Method 2: Try yf.download with different settings
+                    try:
+                        data = yf.download(
+                            tickers=variant,
+                            period=try_period,
+                            interval='1d',
+                            auto_adjust=True,
+                            actions=False,
+                            threads=False,
+                            timeout=30
+                        )
+                        
+                        if data is not None and not data.empty and len(data) > 10:
+                            logger.info(f"Success with yf.download {variant} (period={try_period})")
+                            return data
+                    except Exception as e:
+                        logger.debug(f"yf.download failed for {variant}: {e}")
+                    
+                    # Method 3: Try with start/end dates instead of period
+                    try:
+                        from datetime import datetime, timedelta
+                        
+                        end_date = datetime.now()
+                        if try_period == "1y":
+                            start_date = end_date - timedelta(days=365)
+                        elif try_period == "6mo":
+                            start_date = end_date - timedelta(days=180)
+                        elif try_period == "3mo":
+                            start_date = end_date - timedelta(days=90)
+                        elif try_period == "1mo":
+                            start_date = end_date - timedelta(days=30)
+                        else:
+                            start_date = end_date - timedelta(days=365)  # Default to 1 year
+                        
+                        data = yf.download(
+                            tickers=variant,
+                            start=start_date,
+                            end=end_date,
+                            interval='1d',
+                            auto_adjust=True,
+                            actions=False,
+                            threads=False
+                        )
+                        
+                        if data is not None and not data.empty and len(data) > 10:
+                            logger.info(f"Success with date range download {variant} (start={start_date.date()})")
+                            return data
+                    except Exception as e:
+                        logger.debug(f"Date range download failed for {variant}: {e}")
+                        
+                except Exception as e:
+                    logger.debug(f"All methods failed for variant {variant} with period {try_period}: {e}")
+                    continue
         
+        logger.warning(f"All methods and variants failed for {symbol}")
         return None
 
     def fetch_stock_data(self, symbols: List[str], period: str = "2y") -> Dict[str, pd.DataFrame]:
         """
-        Fetch historical stock data for given symbols
+        Fetch historical stock data for given symbols with smart fallback strategy
         
         Args:
             symbols: List of stock symbols (e.g., ['RELIANCE.NS', 'TCS.NS'])
@@ -140,32 +188,33 @@ class StockDataCollector:
         Returns:
             Dictionary mapping symbols to their historical data
         """
-        logger.info(f"Fetching stock data for {len(symbols)} symbols")
+        logger.info(f"Fetching stock data for {len(symbols)} symbols using smart fallback strategy")
         
         for symbol in symbols:
             try:
-                # Attempt 1: Try symbol variants (primary + fallbacks)
-                data = self._try_symbol_variants(symbol, period)
-
-                if data is None or data.empty:
-                    logger.warning(f"No Yahoo data for {symbol} (tried all variants); attempting local CSV fallback ...")
-                if data is None or data.empty:
-                    logger.warning(f"No Yahoo data for {symbol} (tried all variants); attempting local CSV fallback ...")
-                    fallback_df = self._load_existing_raw(symbol)
-                    if fallback_df is not None and not fallback_df.empty:
-                        self.data[symbol] = fallback_df
-                        logger.info(f"Loaded {len(fallback_df)} fallback records for {symbol}")
-                        continue
-                    else:
-                        logger.warning(f"No data found for {symbol}")
-                        continue
-
-                norm = self._normalize_stock_df(data, symbol)
-                if norm is not None and not norm.empty:
-                    self.data[symbol] = norm
-                    logger.info(f"Successfully fetched {len(norm)} records for {symbol}")
+                data = None
+                
+                # Strategy 1: Try to get fresh data from Yahoo Finance
+                logger.info(f"Attempting fresh data fetch for {symbol}")
+                fresh_data = self._try_symbol_variants(symbol, period)
+                
+                if fresh_data is not None and not fresh_data.empty and len(fresh_data) > 20:
+                    # We got good fresh data
+                    data = self._normalize_stock_df(fresh_data, symbol)
+                    logger.info(f"Successfully fetched fresh data for {symbol}: {len(data)} records")
                 else:
-                    logger.warning(f"Data normalization produced empty frame for {symbol}")
+                    # Strategy 2: Use historical data (always works)
+                    logger.warning(f"Fresh data fetch failed for {symbol}, using historical fallback...")
+                    data = self._load_existing_raw(symbol)
+                    
+                    if data is not None and not data.empty:
+                        logger.info(f"Using historical data for {symbol}: {len(data)} records")
+                
+                if data is not None and not data.empty:
+                    self.data[symbol] = data
+                else:
+                    logger.warning(f"No data found for {symbol} with any method")
+                    
             except Exception as e:
                 logger.error(f"Error fetching data for {symbol}: {str(e)}")
         

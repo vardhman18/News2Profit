@@ -42,6 +42,8 @@ data/models/*.pkl
 data/models/*.h5
 
 # Large CSV files (keep structure but ignore large data)
+# Allow essential stock historical data
+!data/raw/*_historical.csv
 data/raw/*.csv
 data/processed/*.csv
 

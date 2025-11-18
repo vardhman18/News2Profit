@@ -58,13 +58,27 @@ class StockDataCollector:
         try:
             base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
             fname = os.path.join(base_dir, RAW_DATA_DIR, f"{symbol.replace('.', '_')}_historical.csv")
+            logger.info(f"Looking for fallback CSV: {fname}")
+            
             if os.path.exists(fname):
+                logger.info(f"Found fallback CSV file for {symbol}")
                 df = pd.read_csv(fname)
                 if not df.empty:
-                    logger.warning(f"Using existing raw CSV as fallback for {symbol}: {fname}")
-                    return self._normalize_stock_df(df, symbol)
+                    logger.info(f"Successfully loaded {len(df)} rows from fallback CSV for {symbol}")
+                    normalized = self._normalize_stock_df(df, symbol)
+                    if normalized is not None and not normalized.empty:
+                        logger.warning(f"Using existing raw CSV as fallback for {symbol}: {fname}")
+                        return normalized
+                    else:
+                        logger.error(f"Normalization failed for fallback CSV {symbol}")
+                else:
+                    logger.warning(f"Fallback CSV is empty for {symbol}")
+            else:
+                logger.warning(f"No fallback CSV file found at: {fname}")
         except Exception as e:
             logger.error(f"Fallback read failed for {symbol}: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
         return None
     
     def _try_symbol_variants(self, symbol: str, period: str) -> Optional[pd.DataFrame]:

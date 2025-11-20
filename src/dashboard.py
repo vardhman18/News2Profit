@@ -73,18 +73,18 @@ def generate_and_save_predictions():
                 predictions_path = os.path.join(PROCESSED_DATA_DIR, 'latest_predictions.csv')
                 if os.path.exists(predictions_path):
                     predictions_df = pd.read_csv(predictions_path)
-                    st.success(f"✅ Latest predictions generated for {predictions_df['date'].iloc[0]}!")
+                    st.success(f" Latest predictions generated for {predictions_df['date'].iloc[0]}!")
                     return predictions_df
                 else:
-                    st.error("❌ Predictions file not found after generation")
+                    st.error(" Predictions file not found after generation")
                     return None
             else:
-                st.error(f"❌ Error generating predictions: {result.stderr}")
+                st.error(f" Error generating predictions: {result.stderr}")
                 st.error(f"Script output: {result.stdout}")
                 return None
                 
     except Exception as e:
-        st.error(f"❌ Error running prediction generation: {e}")
+        st.error(f" Error running prediction generation: {e}")
         return None
 
 
@@ -229,7 +229,7 @@ class News2ProfitDashboard:
                             if x.replace('.NS', '') in sentiment_df.index else 0.0
                         )
                         predictions_df['sentiment_emoji'] = predictions_df['sentiment_score'].apply(
-                            lambda x: "😊 Positive" if x > 0.1 else "😐 Neutral" if x > -0.1 else "😟 Negative"
+                            lambda x: " Positive" if x > 0.1 else " Neutral" if x > -0.1 else " Negative"
                         )
                 except:
                     predictions_df['sentiment_score'] = 0.0
@@ -401,13 +401,13 @@ class News2ProfitDashboard:
                         
                         # Calculate overall sentiment
                         if positive_count > negative_count:
-                            sentiment_label = "😊 Positive"
+                            sentiment_label = " Positive"
                             sentiment_color = "green"
                         elif negative_count > positive_count:
-                            sentiment_label = "😟 Negative"  
+                            sentiment_label = " Negative"  
                             sentiment_color = "red"
                         else:
-                            sentiment_label = "😐 Neutral"
+                            sentiment_label = " Neutral"
                             sentiment_color = "gray"
                             
                         sentiment_data.append({
@@ -486,7 +486,7 @@ class News2ProfitDashboard:
         start_date = st.sidebar.date_input("Start Date", end_date - timedelta(days=365))
         
         # Model selection
-        st.sidebar.subheader("🤖 Model Settings")
+        st.sidebar.subheader("🧠 Model Settings")
         model_type = st.sidebar.selectbox(
             "Select Model:",
             ["Auto (Best)", "Logistic Regression", "XGBoost", "LSTM"]
@@ -553,10 +553,10 @@ class News2ProfitDashboard:
                 st.session_state.news_data = news_data
                 
                 st.session_state.data_loaded = True
-                st.success(f"✅ Loaded data for {len(stocks)} stocks and {len(news_data)} news items")
+                st.success(f" Loaded data for {len(stocks)} stocks and {len(news_data)} news items")
                 
             except Exception as e:
-                st.error(f"❌ Error loading data: {str(e)}")
+                st.error(f"Error loading data: {str(e)}")
     
     def train_models(self):
         """Train machine learning models"""
@@ -598,7 +598,7 @@ class News2ProfitDashboard:
                 st.session_state.processed_data = ml_data
                 st.session_state.models_trained = True
                 
-                st.success("✅ Models trained successfully!")
+                st.success(" Models trained successfully!")
                 
                 # Show model performance
                 comparison_df = predictor.get_model_comparison()
@@ -606,7 +606,7 @@ class News2ProfitDashboard:
                 st.dataframe(comparison_df)
                 
             except Exception as e:
-                st.error(f"❌ Error training models: {str(e)}")
+                st.error(f" Error training models: {str(e)}")
     
     def generate_predictions(self, model_type):
         """Generate predictions using the selected model"""
@@ -723,7 +723,7 @@ class News2ProfitDashboard:
                         predictions_df.to_csv(predictions_path, index=False)
                         
                 except Exception as e:
-                    st.error(f"❌ Error generating predictions: {e}")
+                    st.error(f" Error generating predictions: {e}")
                     return
 
                 # Load saved predictions into session state
@@ -742,10 +742,10 @@ class News2ProfitDashboard:
                         pass
 
                 # Confirm generation; rendering happens in main content to avoid duplicates
-                st.success("✅ Predictions generated successfully. Scroll to see them below.")
+                st.success(" Predictions generated successfully. Scroll to see them below.")
 
             except Exception as e:
-                st.error(f"❌ Error generating predictions: {str(e)}")
+                st.error(f" Error generating predictions: {str(e)}")
     
     def render_main_content(self, stocks, start_date, end_date):
         """Render the main content area"""
@@ -978,7 +978,7 @@ class News2ProfitDashboard:
     
     def render_sentiment_analysis(self):
         """Render sentiment analysis section"""
-        st.subheader("😊 News Sentiment Analysis")
+        st.subheader("📰 News Sentiment Analysis")
         
         if st.session_state.news_data is None or len(st.session_state.news_data) == 0:
             st.info("No news data available.")
@@ -1030,11 +1030,11 @@ class News2ProfitDashboard:
                     if 'vader_label' in article:
                         sentiment = article['vader_label']
                         if sentiment == 'POSITIVE':
-                            st.success(f"😊 Sentiment: {sentiment}")
+                            st.success(f" Sentiment: {sentiment}")
                         elif sentiment == 'NEGATIVE':
-                            st.error(f"😞 Sentiment: {sentiment}")
+                            st.error(f" Sentiment: {sentiment}")
                         else:
-                            st.info(f"😐 Sentiment: {sentiment}")
+                            st.info(f" Sentiment: {sentiment}")
     
     def run(self):
         """Run the dashboard"""

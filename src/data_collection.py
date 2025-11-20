@@ -519,8 +519,8 @@ def main():
     
     # Fetch data for a few stocks
     # Use the 5 specific NSE stocks used across the project
-    test_symbols = ['RELIANCE.NS', 'TCS.NS', 'INFY.NS', 'HDFCBANK.NS', 'ICICIBANK.NS']
-    stock_data = stock_collector.fetch_stock_data(test_symbols, period="6mo")
+    from config.config import NSE_STOCKS
+    stock_data = stock_collector.fetch_stock_data(NSE_STOCKS, period="6mo")
     
     # Save stock data
     stock_collector.save_stock_data()

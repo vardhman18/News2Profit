@@ -1,7 +1,6 @@
 """
 Sentiment Analysis Module for NEWS2PROFIT
 
-This module handles sentiment analysis of news data using multiple approaches:
 VADER, TextBlob, and BERT-based models.
 """
 

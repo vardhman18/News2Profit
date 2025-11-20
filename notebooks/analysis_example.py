@@ -32,8 +32,9 @@ def example_data_collection():
     stock_collector = StockDataCollector()
     news_collector = NewsDataCollector()
     
-    # Fetch stock data for a few symbols
-    symbols = ['RELIANCE.NS', 'TCS.NS', 'INFY.NS']
+    # Fetch stock data for configured NSE symbols
+    from config.config import NSE_STOCKS
+    symbols = NSE_STOCKS
     print(f"Fetching stock data for: {symbols}")
     
     stock_data = stock_collector.fetch_stock_data(symbols, period="6mo")

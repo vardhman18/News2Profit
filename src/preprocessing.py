@@ -1,7 +1,7 @@
 """
 Data Preprocessing Module for NEWS2PROFIT
 
-This module handles data cleaning, feature engineering, and preprocessing
+data cleaning, feature engineering, and preprocessing
 for both stock data and news data.
 """
 

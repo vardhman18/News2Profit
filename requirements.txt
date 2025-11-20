@@ -1,7 +1,7 @@
 # Core requirements for NEWS2PROFIT deployment
 pandas==1.5.3
 numpy==1.24.3
-yfinance==0.2.32
+yfinance==0.2.66
 requests==2.31.0
 beautifulsoup4==4.12.2
 praw==7.8.1

@@ -888,11 +888,11 @@ class News2ProfitDashboard:
             return
 
         # Use provided selected_stocks if any, otherwise show the default top-5
-        default_symbols = ["RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ICICIBANK.NS"]
-        symbols_to_show = selected_stocks if selected_stocks else default_symbols
+        from config.config import NSE_STOCKS
+        symbols_to_show = selected_stocks if selected_stocks else NSE_STOCKS
 
         # Ensure we only show the five project symbols and keep order
-        symbols_to_show = [s for s in default_symbols if s in symbols_to_show] or default_symbols
+        symbols_to_show = [s for s in NSE_STOCKS if s in symbols_to_show] or NSE_STOCKS
 
         tabs = st.tabs([s.replace('.NS', '') for s in symbols_to_show])
 

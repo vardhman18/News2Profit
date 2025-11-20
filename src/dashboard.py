@@ -509,7 +509,11 @@ class News2ProfitDashboard:
                         'date': row['date']
                     }
                 st.session_state.predictions = preds
-                st.rerun()
+                # Streamlit compatibility: try new rerun() first, fallback to experimental_rerun()
+                try:
+                    st.rerun()
+                except AttributeError:
+                    st.experimental_rerun()
         
         st.sidebar.markdown("---")
         st.sidebar.markdown("**Advanced Options:**")
